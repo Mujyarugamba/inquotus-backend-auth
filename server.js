@@ -1,4 +1,3 @@
-
 const express = require('express');
 const cors = require('cors');
 const bcrypt = require('bcrypt');
@@ -9,29 +8,31 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 const SECRET = process.env.JWT_SECRET || 'supersecret';
 
+// 🔐 Connessione diretta al tuo database su Render
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL || 'postgresql://user:password@localhost:5432/inquotus'
+  connectionString: 'postgresql://inquotus_user:DzioGRSfCTcli9R9sX0ClOxc5dYOT0Ms@dpg-cvsgfi3e5dus7393k5ag-a.frankfurt-postgres.render.com/inquotus'
 });
 
 app.use(cors());
 app.use(express.json());
 
-// Registrazione
+// 📬 API di registrazione
 app.post('/api/register', async (req, res) => {
   const { nome, email, password, ruolo } = req.body;
-  const hashedPassword = await bcrypt.hash(password, 10);
   try {
+    const hashedPassword = await bcrypt.hash(password, 10);
     await pool.query(
       'INSERT INTO utenti (nome, email, password, ruolo) VALUES ($1, $2, $3, $4)',
       [nome, email, hashedPassword, ruolo]
     );
     res.status(201).json({ message: 'Registrazione completata' });
   } catch (err) {
+    console.error('Errore registrazione:', err);
     res.status(500).json({ error: 'Errore durante la registrazione' });
   }
 });
 
-// Login
+// 🔐 API di login
 app.post('/api/login', async (req, res) => {
   const { email, password } = req.body;
   try {
@@ -45,14 +46,17 @@ app.post('/api/login', async (req, res) => {
     const token = jwt.sign({ id: utente.id, ruolo: utente.ruolo }, SECRET, { expiresIn: '1d' });
     res.json({ token });
   } catch (err) {
+    console.error('Errore login:', err);
     res.status(500).json({ error: 'Errore durante il login' });
   }
 });
 
+// ✅ Endpoint base
 app.get('/', (req, res) => {
   res.send('API Inquotus Auth attiva!');
 });
 
 app.listen(PORT, () => {
-  console.log(`Server avviato sulla porta ${PORT}`);
+  console.log(`✅ Server avviato sulla porta ${PORT}`);
 });
+
