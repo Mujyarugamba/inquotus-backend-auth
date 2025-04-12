@@ -16,7 +16,10 @@ const pool = new Pool({
   }
 });
 
-app.use(cors());
+// ✅ CORS abilitato per tutti i domini
+app.use(cors({
+  origin: '*'
+}));
 app.use(express.json());
 
 // ✅ API di test
