@@ -8,15 +8,23 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 const SECRET = process.env.JWT_SECRET || 'supersecret';
 
-// 🔐 Connessione diretta al tuo database su Render
+// ✅ Connessione a PostgreSQL con SSL per Render
 const pool = new Pool({
-  connectionString: 'postgresql://inquotus_user:DzioGRSfCTcli9R9sX0ClOxc5dYOT0Ms@dpg-cvsgfi3e5dus7393k5ag-a.frankfurt-postgres.render.com/inquotus'
+  connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false
+  }
 });
 
 app.use(cors());
 app.use(express.json());
 
-// 📬 API di registrazione
+// ✅ API di test
+app.get('/', (req, res) => {
+  res.send('API Inquotus Auth attiva!');
+});
+
+// ✅ Registrazione utente
 app.post('/api/register', async (req, res) => {
   const { nome, email, password, ruolo } = req.body;
   try {
@@ -25,14 +33,14 @@ app.post('/api/register', async (req, res) => {
       'INSERT INTO utenti (nome, email, password, ruolo) VALUES ($1, $2, $3, $4)',
       [nome, email, hashedPassword, ruolo]
     );
-    res.status(201).json({ message: 'Registrazione completata' });
+    res.status(201).json({ message: 'Registrazione completata!' });
   } catch (err) {
     console.error('Errore registrazione:', err);
     res.status(500).json({ error: 'Errore durante la registrazione' });
   }
 });
 
-// 🔐 API di login
+// ✅ Login utente
 app.post('/api/login', async (req, res) => {
   const { email, password } = req.body;
   try {
@@ -51,12 +59,7 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
-// ✅ Endpoint base
-app.get('/', (req, res) => {
-  res.send('API Inquotus Auth attiva!');
-});
-
+// ✅ Avvio server
 app.listen(PORT, () => {
-  console.log(`✅ Server avviato sulla porta ${PORT}`);
+  console.log(`Server avviato sulla porta ${PORT}`);
 });
-
