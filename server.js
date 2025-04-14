@@ -78,3 +78,23 @@ app.get('/api/user/:id', async (req, res) => {
 app.listen(PORT, () => {
   console.log(`✅ Server avviato sulla porta ${PORT}`);
 });
+// ✅ /api/utente con token (per React)
+app.get('/api/utente', async (req, res) => {
+  const auth = req.headers.authorization;
+  if (!auth) return res.status(401).json({ error: 'Token mancante' });
+
+  try {
+    const token = auth.split(' ')[1];
+    const decoded = jwt.verify(token, SECRET);
+
+    const result = await pool.query(
+      'SELECT id, nome, email, ruolo FROM utenti WHERE id = $1',
+      [decoded.id]
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Errore token:', err);
+    res.status(403).json({ error: 'Token non valido' });
+  }
+});
+
