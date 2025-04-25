@@ -16,11 +16,23 @@ const pool = new Pool({
   ssl: { rejectUnauthorized: false }
 });
 
-// Configurazione CORS per accettare solo richieste dal dominio https://www.inquotus.it
+// Configurazione CORS per supportare richieste da produzione e sviluppo
+const allowedOrigins = [
+  'https://www.inquotus.it',  // Dominio di produzione
+  'http://localhost:3000',     // Dominio di sviluppo
+];
+
 app.use(cors({
-  origin: 'https://www.inquotus.it', // Permetti solo il dominio desiderato
+  origin: (origin, callback) => {
+    // Permetti tutte le richieste provenienti dai domini che sono nella lista
+    if (allowedOrigins.indexOf(origin) !== -1 || !origin) {
+      callback(null, true);
+    } else {
+      callback(new Error('Accesso negato: origine non autorizzata'));
+    }
+  },
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
 app.use(express.json());
@@ -114,4 +126,3 @@ app.get('/api/utente', async (req, res) => {
 app.listen(PORT, () => {
   console.log(`✅ Server avviato sulla porta ${PORT}`);
 });
-
