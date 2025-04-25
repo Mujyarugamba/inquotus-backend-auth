@@ -1,0 +1,13 @@
+# Dipendenze
+node_modules/
+
+# Build e cache
+build/
+dist/
+.cache/
+
+# Config editor
+.vscode/
+
+# Variabili d'ambiente (⚠️ mai su Git)
+.env
