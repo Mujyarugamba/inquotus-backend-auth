@@ -4,17 +4,17 @@ const express = require('express');
 const cors = require('cors');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const multer = require('multer');
-const path = require('path');
-const nodemailer = require('nodemailer');
 const { Pool } = require('pg');
-const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
-const http = require('http');
-const WebSocket = require('ws');
 
 const app = express();
-const PORT = process.env.PORT || 3002;
-const SECRET = process.env.JWT_SECRET || 'supersegreto';
+const PORT = process.env.PORT || 5000;
+const SECRET = process.env.JWT_SECRET || 'supersecret';
+
+// Connessione a PostgreSQL su Render (con SSL attivo)
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false }
+});
 
 // Configurazione CORS per accettare solo richieste dal dominio https://www.inquotus.it
 app.use(cors({
@@ -24,125 +24,94 @@ app.use(cors({
 }));
 
 app.use(express.json());
-app.use('/uploads', express.static('uploads'));
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: false,
-});
-
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, 'uploads/'),
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname);
-    const nomeFile = Date.now() + '-' + file.fieldname + ext;
-    cb(null, nomeFile);
-  }
-});
-const upload = multer({ storage });
-
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
-  }
-});
-
-// Middleware
-function autenticaToken(req, res, next) {
-  const token = req.headers.authorization?.split(' ')[1];
-  if (!token) return res.status(401).json({ error: 'Token mancante' });
-  jwt.verify(token, SECRET, (err, utente) => {
-    if (err) return res.status(403).json({ error: 'Token non valido' });
-    req.utente = utente;
-    next();
-  });
-}
-
-function soloImpresaOProfessionista(req, res, next) {
-  const ruolo = req.utente?.ruolo;
-  if (ruolo === 'impresa' || ruolo === 'professionista') return next();
-  return res.status(403).json({ error: 'Accesso riservato a imprese e professionisti' });
-}
-
-function soloCommittente(req, res, next) {
-  const ruolo = req.utente?.ruolo;
-  if (ruolo === 'committente') return next();
-  return res.status(403).json({ error: 'Accesso riservato ai committenti' });
-}
-
-// API routes
+// API di test
 app.get('/', (req, res) => {
-  res.send('✅ API Inquotus attiva!');
+  res.send('API Inquotus Auth attiva!');
 });
 
+// Registrazione utente
+app.post('/api/register', async (req, res) => {
+  const { nome, email, password, ruolo } = req.body;
+  try {
+    const hashedPassword = await bcrypt.hash(password, 10);
+    
+    // Verifica se l'email è già registrata
+    const result = await pool.query('SELECT id FROM utenti WHERE email = $1', [email]);
+    if (result.rows.length > 0) {
+      return res.status(409).json({ error: 'Email già registrata' });
+    }
+
+    // Inserimento nuovo utente
+    await pool.query(
+      'INSERT INTO utenti (nome, email, password, ruolo) VALUES ($1, $2, $3, $4)',
+      [nome, email, hashedPassword, ruolo]
+    );
+    res.status(201).json({ message: 'Registrazione completata!' });
+  } catch (err) {
+    console.error('Errore registrazione:', err);
+    res.status(500).json({ error: 'Errore durante la registrazione' });
+  }
+});
+
+// Login utente
 app.post('/api/login', async (req, res) => {
   const { email, password } = req.body;
   try {
     const result = await pool.query('SELECT * FROM utenti WHERE email = $1', [email]);
     const utente = result.rows[0];
-    if (!utente) return res.status(401).json({ error: 'Utente non trovato' });
+    if (!utente) return res.status(404).json({ error: 'Utente non trovato' });
 
-    const match = await bcrypt.compare(password, utente.password);
-    if (!match) return res.status(401).json({ error: 'Password errata' });
+    const isValid = await bcrypt.compare(password, utente.password);
+    if (!isValid) return res.status(401).json({ error: 'Credenziali errate' });
 
-    const token = jwt.sign(
-      { id: utente.id, email: utente.email, ruolo: utente.ruolo, nome: utente.nome },
-      SECRET,
-      { expiresIn: '7d' }
-    );
-
-    res.json({ token, ruolo: utente.ruolo });
+    const token = jwt.sign({ id: utente.id, ruolo: utente.ruolo }, SECRET, { expiresIn: '1d' });
+    res.json({ token });
   } catch (err) {
-    console.error('Errore login:', err.message);
-    res.status(500).json({ error: 'Errore login' });
+    console.error('Errore login:', err);
+    res.status(500).json({ error: 'Errore durante il login' });
   }
 });
 
-app.post('/api/register', async (req, res) => {
-  const { nome, email, password, ruolo } = req.body;
+// ✅ Recupero dati utente dopo login
+app.get('/api/user/:id', async (req, res) => {
+  const userId = req.params.id;
   try {
-    const esiste = await pool.query('SELECT id FROM utenti WHERE email = $1', [email]);
-    if (esiste.rows.length > 0) return res.status(409).json({ error: 'Email già registrata' });
-
-    const hashed = await bcrypt.hash(password, 10);
-    await pool.query(
-      `INSERT INTO utenti (nome, email, password, ruolo, approvato)
-       VALUES ($1, $2, $3, $4, $5)`,
-      [nome, email, hashed, ruolo, true]
+    const result = await pool.query(
+      'SELECT nome, email, ruolo FROM utenti WHERE id = $1',
+      [userId]
     );
-    res.status(201).json({ message: 'Registrazione completata' });
+    const user = result.rows[0];
+    if (!user) return res.status(404).json({ error: 'Utente non trovato' });
+    res.json(user);
   } catch (err) {
-    console.error('Errore registrazione:', err.message);
-    res.status(500).json({ error: 'Errore registrazione' });
+    console.error('Errore recupero utente:', err);
+    res.status(500).json({ error: 'Errore nel recupero utente' });
   }
 });
 
-app.get('/api/whoami', autenticaToken, (req, res) => {
-  res.json({
-    id: req.utente.id,
-    email: req.utente.email,
-    ruolo: req.utente.ruolo,
-    nome: req.utente.nome || req.utente.email
-  });
+// ✅ Recupero dati utente con token
+app.get('/api/utente', async (req, res) => {
+  const auth = req.headers.authorization;
+  if (!auth) return res.status(401).json({ error: 'Token mancante' });
+
+  try {
+    const token = auth.split(' ')[1];
+    const decoded = jwt.verify(token, SECRET);
+
+    const result = await pool.query(
+      'SELECT id, nome, email, ruolo FROM utenti WHERE id = $1',
+      [decoded.id]
+    );
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Errore token:', err);
+    res.status(403).json({ error: 'Token non valido' });
+  }
 });
 
-// === SERVER HTTP + WEBSOCKET ===
-const server = http.createServer(app);
-const wss = new WebSocket.Server({ server });
-
-wss.on('connection', (ws) => {
-  console.log('✅ Client WebSocket connesso');
-  ws.send('Benvenuto su Inquotus WebSocket!');
-  ws.on('message', (message) => {
-    console.log('Messaggio ricevuto dal client:', message);
-  });
-  ws.on('close', () => {
-    console.log('❌ Client disconnesso');
-  });
+// Avvio del server
+app.listen(PORT, () => {
+  console.log(`✅ Server avviato sulla porta ${PORT}`);
 });
 
-server.listen(PORT, () => {
-  console.log(`🚀 Server Inquotus (API + WebSocket) su http://localhost:${PORT}`);
-});
