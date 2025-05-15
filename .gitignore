@@ -11,3 +11,4 @@ dist/
 
 # Variabili d'ambiente (⚠️ mai su Git)
 .env
+.env.local
