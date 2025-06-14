@@ -3,7 +3,7 @@ require('dotenv').config({ path: path.resolve(__dirname, '.env.local') });
 
 const express = require('express');
 const cors = require('cors');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { createClient } = require('@supabase/supabase-js');
 const fs = require('fs');
