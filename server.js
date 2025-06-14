@@ -19,7 +19,7 @@ const verifyToken = require('./middlewares/verifyToken');
 const onlyRole = require('./middlewares/onlyRole');
 
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 10000;
 const SECRET = process.env.JWT_SECRET || 'supersecret';
 const LOG_PATH = path.join(__dirname, 'logs', 'access.log');
 
@@ -34,7 +34,6 @@ const allowedOrigins = [
   'http://localhost:3005'
 ];
 
-// CORS PRIMA DI TUTTO
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin || allowedOrigins.includes(origin)) {
@@ -114,6 +113,8 @@ app.post('/api/register', async (req, res) => {
     return res.status(400).json({ error: 'Ruolo non valido o mancante' });
   }
 
+  console.log('📨 Registrazione richiesta da:', email, 'con ruolo:', ruolo);
+
   try {
     const result = await pool.query('SELECT id FROM utenti WHERE email = $1', [email]);
     if (result.rows.length > 0) {
@@ -145,6 +146,11 @@ app.post('/api/register', async (req, res) => {
     await pool.query(
       'INSERT INTO utenti (email, password, ruolo) VALUES ($1, $2, $3)',
       [email, hashedPassword, ruolo]
+    );
+
+    await pool.query(
+      'INSERT INTO log_attivita (azione, email, dettaglio) VALUES ($1, $2, $3)',
+      ['registrazione', email, `Ruolo: ${ruolo}`]
     );
 
     res.status(201).json({ message: 'Registrazione completata' });
@@ -215,6 +221,8 @@ app.get('/api/me', verifyToken(), (req, res) => {
 app.listen(PORT, () => {
   console.log(`✅ Server Inquotus avviato sulla porta ${PORT}`);
 });
+
+
 
 
 
