@@ -29,7 +29,7 @@ const inviaNotificaSblocco = async ({ id_richiesta, id_esecutore }) => {
       from: `"Inquotus" <${process.env.SMTP_USER}>`,
       to: email_committente,
       subject: `📬 La tua richiesta è stata sbloccata`,
-      text: `La tua richiesta "${titolo}" a ${localita} è stata appena sbloccata da un'impresa o professionista.\n\nAccedi a Inquotus per i dettagli e per gestire i contatti.`
+      text: `La tua richiesta "${titolo}" a ${localita} è stata appena sbloccata da un'impresa o progettista.\n\nAccedi a Inquotus per i dettagli e per gestire i contatti.`
     });
   } catch (err) {
     console.error("Errore durante l'invio della notifica di sblocco:", err);

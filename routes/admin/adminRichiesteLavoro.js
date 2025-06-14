@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const pool = require('../../db');
-const authAdmin = require('../../middleware/authAdmin');
+const authAdmin = require('../../routes/middleware/authAdmin');
 
 // Elenco richieste
 router.get('/richieste-lavoro', authAdmin, async (req, res) => {
