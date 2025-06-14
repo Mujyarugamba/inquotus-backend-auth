@@ -34,30 +34,35 @@ const allowedOrigins = [
   'http://localhost:3005'
 ];
 
+// Middleware CORS principale
+app.use(cors({
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('CORS non permesso'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
+// Middleware per gestire tutte le richieste OPTIONS (preflight)
+app.options('*', cors());
+
+// Middleware per header personalizzati e logging origine
 app.use((req, res, next) => {
   const origin = req.headers.origin;
   console.log('🌐 Origin ricevuto:', origin);
-
   if (allowedOrigins.includes(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization');
     res.setHeader('Access-Control-Allow-Credentials', 'true');
   }
-
-  if (req.method === 'OPTIONS') {
-    return res.sendStatus(204);
-  }
-
   next();
 });
-
-app.use(cors({
-  origin: allowedOrigins,
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
 
 app.use(express.json());
 
