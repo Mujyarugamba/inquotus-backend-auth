@@ -25,7 +25,7 @@ const LOG_PATH = path.join(__dirname, 'logs', 'access.log');
 
 const allowedOrigins = [
   'https://www.inquotus.it',
-  'https://srv-cvukp4h5pdvs73c5sef0.onrender.com',
+  'https://inquotus-backend-auth.onrender.com',
   'http://localhost:3000',
   'http://localhost:3001',
   'http://localhost:3002',
@@ -48,10 +48,10 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-// Middleware per gestire tutte le richieste OPTIONS (preflight)
+// Middleware per richieste OPTIONS
 app.options('*', cors());
 
-// Middleware per header personalizzati e logging origine
+// Middleware per logging e intestazioni
 app.use((req, res, next) => {
   const origin = req.headers.origin;
   console.log('🌐 Origin ricevuto:', origin);
@@ -71,56 +71,14 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
+// Logging attività
 app.use((req, res, next) => {
   const log = `${new Date().toISOString()} ${req.method} ${req.url} [${req.ip}]\n`;
   fs.appendFile(LOG_PATH, log, () => {});
   next();
 });
 
-app.use('/api/richieste-sbloccate', verifyToken(['impresa', 'progettista']), async (req, res, next) => {
-  if (req.method === 'POST') {
-    let body = '';
-    req.on('data', chunk => (body += chunk));
-    req.on('end', async () => {
-      try {
-        const parsed = JSON.parse(body);
-        const richiestaId = parsed?.richiestaId || 'ID sconosciuto';
-        const email = req.user?.email || 'ignoto';
-        const log = `${new Date().toISOString()} 🔓 SBLOCCO richiesta da utente ${email} su richiesta ${richiestaId}\n`;
-        fs.appendFile(LOG_PATH, log, () => {});
-
-        await pool.query(
-          'INSERT INTO log_attivita (azione, email, dettaglio) VALUES ($1, $2, $3)',
-          ['sblocco_richiesta', email, `richiestaId: ${richiestaId}`]
-        );
-      } catch (_) {}
-      next();
-    });
-  } else {
-    next();
-  }
-});
-
-app.use('/api', verifyToken(), corsiRouter);
-app.use('/api', verifyToken(), richiesteLavoroRoute);
-app.use('/api', verifyToken(['impresa', 'progettista']), richiesteSbloccateRoute);
-app.use('/api/admin', verifyToken(['admin']), onlyRole('admin'), adminRichiesteLavoro);
-app.use('/api/admin/email', verifyToken(['admin']), onlyRole('admin'), adminEmailRoute);
-
-app.get('/api/log-attivita', verifyToken(['admin']), onlyRole('admin'), async (req, res) => {
-  try {
-    const { rows } = await pool.query('SELECT * FROM log_attivita ORDER BY timestamp DESC LIMIT 100');
-    res.status(200).json(rows);
-  } catch (err) {
-    console.error('Errore recupero log_attivita:', err);
-    res.status(500).json({ error: 'Errore interno nel recupero dei log' });
-  }
-});
-
-app.get('/', (req, res) => {
-  res.send('✅ API Inquotus attiva!');
-});
-
+// ✅ ROTTE PUBBLICHE
 app.post('/api/register', async (req, res) => {
   const { email, password, ruolo } = req.body;
 
@@ -233,9 +191,54 @@ app.get('/api/me', verifyToken(), (req, res) => {
   });
 });
 
+// ✅ MIDDLEWARE + ROTTE PROTETTE
+app.use('/api/richieste-sbloccate', verifyToken(['impresa', 'progettista']), async (req, res, next) => {
+  if (req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => (body += chunk));
+    req.on('end', async () => {
+      try {
+        const parsed = JSON.parse(body);
+        const richiestaId = parsed?.richiestaId || 'ID sconosciuto';
+        const email = req.user?.email || 'ignoto';
+        const log = `${new Date().toISOString()} 🔓 SBLOCCO richiesta da utente ${email} su richiesta ${richiestaId}\n`;
+        fs.appendFile(LOG_PATH, log, () => {});
+        await pool.query(
+          'INSERT INTO log_attivita (azione, email, dettaglio) VALUES ($1, $2, $3)',
+          ['sblocco_richiesta', email, `richiestaId: ${richiestaId}`]
+        );
+      } catch (_) {}
+      next();
+    });
+  } else {
+    next();
+  }
+});
+
+app.use('/api', verifyToken(), corsiRouter);
+app.use('/api', verifyToken(), richiesteLavoroRoute);
+app.use('/api', verifyToken(['impresa', 'progettista']), richiesteSbloccateRoute);
+app.use('/api/admin', verifyToken(['admin']), onlyRole('admin'), adminRichiesteLavoro);
+app.use('/api/admin/email', verifyToken(['admin']), onlyRole('admin'), adminEmailRoute);
+
+app.get('/api/log-attivita', verifyToken(['admin']), onlyRole('admin'), async (req, res) => {
+  try {
+    const { rows } = await pool.query('SELECT * FROM log_attivita ORDER BY timestamp DESC LIMIT 100');
+    res.status(200).json(rows);
+  } catch (err) {
+    console.error('Errore recupero log_attivita:', err);
+    res.status(500).json({ error: 'Errore interno nel recupero dei log' });
+  }
+});
+
+app.get('/', (req, res) => {
+  res.send('✅ API Inquotus attiva!');
+});
+
 app.listen(PORT, () => {
   console.log(`✅ Server Inquotus avviato sulla porta ${PORT}`);
 });
+
 
 
 
