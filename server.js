@@ -19,7 +19,7 @@ const verifyToken = require('./middlewares/verifyToken');
 const onlyRole = require('./middlewares/onlyRole');
 
 const app = express();
-const PORT = process.env.PORT;
+const PORT = process.env.PORT || 10000;
 const SECRET = process.env.JWT_SECRET || 'supersecret';
 const LOG_PATH = path.join(__dirname, 'logs', 'access.log');
 
@@ -131,6 +131,19 @@ app.post('/api/register', async (req, res) => {
     res.status(500).json({ error: 'Errore interno' });
   }
 });
+
+// ⬇️ ROUTES
+app.use('/api/richieste', verifyToken, richiesteLavoroRoute);
+app.use('/api/admin/richieste', verifyToken, onlyRole('admin'), adminRichiesteLavoro);
+app.use('/api/admin/email', verifyToken, onlyRole('admin'), adminEmailRoute);
+app.use('/api/corsi', verifyToken, corsiRouter);
+app.use('/api/sblocchi', verifyToken, richiesteSbloccateRoute);
+
+// ⬇️ AVVIO SERVER
+app.listen(PORT, () => {
+  console.log(`🚀 Server avviato sulla porta ${PORT}`);
+});
+
 
 
 
