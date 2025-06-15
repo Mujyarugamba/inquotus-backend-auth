@@ -34,7 +34,6 @@ const allowedOrigins = [
   'http://localhost:3005'
 ];
 
-// CORS
 app.use(cors({
   origin: function (origin, callback) {
     if (!origin || allowedOrigins.includes(origin)) {
@@ -52,7 +51,6 @@ app.options('*', cors());
 
 app.use((req, res, next) => {
   const origin = req.headers.origin;
-  console.log('🌐 Origin ricevuto:', origin);
   if (allowedOrigins.includes(origin)) {
     res.setHeader('Access-Control-Allow-Origin', origin);
     res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
@@ -64,58 +62,21 @@ app.use((req, res, next) => {
 
 app.use(express.json());
 
-// Supabase client
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-// Logging file
 app.use((req, res, next) => {
   const log = `${new Date().toISOString()} ${req.method} ${req.url} [${req.ip}]\n`;
   fs.appendFile(LOG_PATH, log, () => {});
   next();
 });
 
-// ✅ Controllo e creazione tabella log_attivita all'avvio
-(async () => {
-  try {
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS log_attivita (
-        id SERIAL PRIMARY KEY,
-        azione TEXT NOT NULL,
-        email TEXT NOT NULL,
-        dettaglio TEXT,
-        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-    `);
-    console.log('✅ Tabella log_attivita pronta');
-  } catch (err) {
-    console.error('❌ Errore creazione tabella log_attivita:', err);
-  }
-})();
-
-// ✅ ROTTA DEBUG per testare tabella log_attivita
-app.get('/debug/check-log-table', async (req, res) => {
-  try {
-    const result = await pool.query(`SELECT * FROM log_attivita LIMIT 5`);
-    res.json({ esiste: true, righe: result.rows });
-  } catch (error) {
-    console.error(error);
-    res.json({ esiste: false, errore: error.message });
-  }
-});
-
-// 🔐 Registrazione
 app.post('/api/register', async (req, res) => {
   const { email, password, ruolo } = req.body;
 
-  console.log('✅ SERVER.JS AGGIORNATO E IN ESECUZIONE CORRETTA');
   console.log('📨 Registrazione richiesta da:', email, 'con ruolo:', ruolo);
-
-  if (!['committente', 'impresa', 'progettista'].includes(ruolo)) {
-    return res.status(400).json({ error: 'Ruolo non valido o mancante' });
-  }
 
   try {
     const result = await pool.query('SELECT id FROM utenti WHERE email = $1', [email]);
@@ -124,6 +85,7 @@ app.post('/api/register', async (req, res) => {
     }
 
     const { data: allUsers, error: userCheckError } = await supabase.auth.admin.listUsers();
+
     if (userCheckError) {
       console.error('Errore controllo utenti Supabase:', userCheckError.message);
       return res.status(500).json({ error: 'Errore verifica Supabase' });
@@ -134,7 +96,7 @@ app.post('/api/register', async (req, res) => {
       return res.status(409).json({ error: 'Email già registrata su Supabase' });
     }
 
-    const { data, error } = await supabase.auth.admin.createUser({
+    const { error } = await supabase.auth.admin.createUser({
       email,
       password,
       user_metadata: { ruolo },
@@ -142,7 +104,7 @@ app.post('/api/register', async (req, res) => {
     });
 
     if (error) {
-      console.error('Supabase error:', error);
+      console.error('Errore registrazione Supabase:', error);
       return res.status(500).json({ error: 'Errore registrazione Supabase' });
     }
 
@@ -164,14 +126,14 @@ app.post('/api/register', async (req, res) => {
   }
 });
 
-// ⬇️ ROUTES
+// ROTTE API
 app.use('/api/richieste', verifyToken, richiesteLavoroRoute);
 app.use('/api/admin/richieste', verifyToken, onlyRole('admin'), adminRichiesteLavoro);
 app.use('/api/admin/email', verifyToken, onlyRole('admin'), adminEmailRoute);
 app.use('/api/corsi', verifyToken, corsiRouter);
 app.use('/api/sblocchi', verifyToken, richiesteSbloccateRoute);
 
-// ⬇️ AVVIO SERVER
+// AVVIO SERVER
 app.listen(PORT, () => {
   console.log(`🚀 Server avviato sulla porta ${PORT}`);
 });
