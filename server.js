@@ -34,7 +34,6 @@ const allowedOrigins = [
   'http://localhost:3005'
 ];
 
-// Middleware CORS principale
 app.use(cors({
   origin: function (origin, callback) {
     if (!origin || allowedOrigins.includes(origin)) {
@@ -48,10 +47,8 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-// Middleware per richieste OPTIONS
 app.options('*', cors());
 
-// Middleware per logging e intestazioni
 app.use((req, res, next) => {
   const origin = req.headers.origin;
   console.log('🌐 Origin ricevuto:', origin);
@@ -71,14 +68,12 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-// Logging attività
 app.use((req, res, next) => {
   const log = `${new Date().toISOString()} ${req.method} ${req.url} [${req.ip}]\n`;
   fs.appendFile(LOG_PATH, log, () => {});
   next();
 });
 
-// ✅ ROTTE PUBBLICHE
 app.post('/api/register', async (req, res) => {
   const { email, password, ruolo } = req.body;
 
@@ -94,12 +89,15 @@ app.post('/api/register', async (req, res) => {
       return res.status(409).json({ error: 'Email già registrata nel sistema' });
     }
 
-    const { data: userCheck, error: userCheckError } = await supabase.auth.admin.listUsers({ email });
+    const { data: allUsers, error: userCheckError } = await supabase.auth.admin.listUsers();
+
     if (userCheckError) {
       console.error('Errore controllo utenti Supabase:', userCheckError.message);
       return res.status(500).json({ error: 'Errore verifica Supabase' });
     }
-    if (userCheck?.users?.length > 0) {
+
+    const alreadyExists = allUsers.users.some((user) => user.email === email);
+    if (alreadyExists) {
       return res.status(409).json({ error: 'Email già registrata su Supabase' });
     }
 
@@ -191,7 +189,6 @@ app.get('/api/me', verifyToken(), (req, res) => {
   });
 });
 
-// ✅ MIDDLEWARE + ROTTE PROTETTE
 app.use('/api/richieste-sbloccate', verifyToken(['impresa', 'progettista']), async (req, res, next) => {
   if (req.method === 'POST') {
     let body = '';
