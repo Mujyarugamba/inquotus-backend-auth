@@ -19,7 +19,7 @@ const verifyToken = require('./middlewares/verifyToken');
 const onlyRole = require('./middlewares/onlyRole');
 
 const app = express();
-const PORT = process.env.PORT || 10000;
+const PORT = process.env.PORT; // Render richiede l'uso esplicito della variabile PORT
 const SECRET = process.env.JWT_SECRET || 'supersecret';
 const LOG_PATH = path.join(__dirname, 'logs', 'access.log');
 
@@ -130,6 +130,7 @@ app.post('/api/register', async (req, res) => {
     res.status(500).json({ error: 'Errore interno' });
   }
 });
+
 
 
 
