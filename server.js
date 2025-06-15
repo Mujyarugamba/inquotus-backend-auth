@@ -74,6 +74,22 @@ app.use((req, res, next) => {
   next();
 });
 
+// 🔧 Rotta per aggiornare il vincolo ruolo nel database
+app.get('/debug/fix-ruolo', async (req, res) => {
+  try {
+    await pool.query('ALTER TABLE utenti DROP CONSTRAINT IF EXISTS utenti_ruolo_check');
+    await pool.query(`
+      ALTER TABLE utenti
+      ADD CONSTRAINT utenti_ruolo_check
+      CHECK (ruolo IN ('committente', 'impresa', 'progettista'))
+    `);
+    res.send('✅ Vincolo "ruolo" aggiornato nel database.');
+  } catch (error) {
+    console.error('❌ Errore durante l’aggiornamento del vincolo:', error);
+    res.status(500).send('Errore durante la modifica del vincolo.');
+  }
+});
+
 app.post('/api/register', async (req, res) => {
   const { email, password, ruolo } = req.body;
 
@@ -143,6 +159,7 @@ app.use('/api/sblocchi', verifyToken, richiesteSbloccateRoute);
 app.listen(PORT, () => {
   console.log(`🚀 Server avviato sulla porta ${PORT}`);
 });
+
 
 
 
