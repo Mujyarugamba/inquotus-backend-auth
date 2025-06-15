@@ -23,6 +23,7 @@ const PORT = process.env.PORT || 10000;
 const SECRET = process.env.JWT_SECRET || 'supersecret';
 const LOG_PATH = path.join(__dirname, 'logs', 'access.log');
 
+// CORS
 const allowedOrigins = [
   'https://www.inquotus.it',
   'https://inquotus-backend-auth.onrender.com',
@@ -63,17 +64,38 @@ app.use((req, res, next) => {
 
 app.use(express.json());
 
+// Supabase
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
+// Logging
 app.use((req, res, next) => {
   const log = `${new Date().toISOString()} ${req.method} ${req.url} [${req.ip}]\n`;
   fs.appendFile(LOG_PATH, log, () => {});
   next();
 });
 
+// ✅ Crea tabella log_attivita se non esiste
+(async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS log_attivita (
+        id SERIAL PRIMARY KEY,
+        azione TEXT NOT NULL,
+        email TEXT NOT NULL,
+        dettaglio TEXT,
+        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    console.log('✅ Tabella log_attivita pronta');
+  } catch (err) {
+    console.error('❌ Errore creazione log_attivita:', err);
+  }
+})();
+
+// 📩 Rotta di registrazione
 app.post('/api/register', async (req, res) => {
   const { email, password, ruolo } = req.body;
 
