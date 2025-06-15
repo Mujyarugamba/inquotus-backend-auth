@@ -19,7 +19,7 @@ const verifyToken = require('./middlewares/verifyToken');
 const onlyRole = require('./middlewares/onlyRole');
 
 const app = express();
-const PORT = process.env.PORT; // Render richiede l'uso esplicito della variabile PORT
+const PORT = process.env.PORT;
 const SECRET = process.env.JWT_SECRET || 'supersecret';
 const LOG_PATH = path.join(__dirname, 'logs', 'access.log');
 
@@ -77,11 +77,12 @@ app.use((req, res, next) => {
 app.post('/api/register', async (req, res) => {
   const { email, password, ruolo } = req.body;
 
+  console.log('✅ SERVER.JS AGGIORNATO E IN ESECUZIONE CORRETTA');
+  console.log('📨 Registrazione richiesta da:', email, 'con ruolo:', ruolo);
+
   if (!['committente', 'impresa', 'progettista'].includes(ruolo)) {
     return res.status(400).json({ error: 'Ruolo non valido o mancante' });
   }
-
-  console.log('📨 Registrazione richiesta da:', email, 'con ruolo:', ruolo);
 
   try {
     const result = await pool.query('SELECT id FROM utenti WHERE email = $1', [email]);
@@ -130,6 +131,7 @@ app.post('/api/register', async (req, res) => {
     res.status(500).json({ error: 'Errore interno' });
   }
 });
+
 
 
 
