@@ -74,29 +74,6 @@ app.use((req, res, next) => {
   next();
 });
 
-// ✅ DEBUG: elimina la colonna 'nome' da 'utenti' se esiste
-app.get('/debug/drop-nome', async (req, res) => {
-  try {
-    await pool.query(`
-      DO $$
-      BEGIN
-        IF EXISTS (
-          SELECT 1
-          FROM information_schema.columns
-          WHERE table_name = 'utenti' AND column_name = 'nome'
-        ) THEN
-          EXECUTE 'ALTER TABLE utenti DROP COLUMN nome';
-        END IF;
-      END
-      $$;
-    `);
-    res.send('✅ Colonna "nome" eliminata se esisteva.');
-  } catch (err) {
-    console.error('Errore durante DROP COLUMN nome:', err);
-    res.status(500).send('Errore durante eliminazione colonna "nome": ' + err.message);
-  }
-});
-
 app.post('/api/register', async (req, res) => {
   const { email, password, ruolo } = req.body;
 
@@ -166,6 +143,7 @@ app.use('/api/sblocchi', verifyToken, richiesteSbloccateRoute);
 app.listen(PORT, () => {
   console.log(`🚀 Server avviato sulla porta ${PORT}`);
 });
+
 
 
 
