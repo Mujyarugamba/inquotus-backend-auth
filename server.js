@@ -23,7 +23,6 @@ const PORT = process.env.PORT || 10000;
 const SECRET = process.env.JWT_SECRET || 'supersecret';
 const LOG_PATH = path.join(__dirname, 'logs', 'access.log');
 
-// CORS
 const allowedOrigins = [
   'https://www.inquotus.it',
   'https://inquotus-backend-auth.onrender.com',
@@ -35,6 +34,7 @@ const allowedOrigins = [
   'http://localhost:3005'
 ];
 
+// CORS
 app.use(cors({
   origin: function (origin, callback) {
     if (!origin || allowedOrigins.includes(origin)) {
@@ -64,20 +64,20 @@ app.use((req, res, next) => {
 
 app.use(express.json());
 
-// Supabase
+// Supabase client
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-// Logging
+// Logging file
 app.use((req, res, next) => {
   const log = `${new Date().toISOString()} ${req.method} ${req.url} [${req.ip}]\n`;
   fs.appendFile(LOG_PATH, log, () => {});
   next();
 });
 
-// ✅ Crea tabella log_attivita se non esiste
+// ✅ Controllo e creazione tabella log_attivita all'avvio
 (async () => {
   try {
     await pool.query(`
@@ -91,11 +91,22 @@ app.use((req, res, next) => {
     `);
     console.log('✅ Tabella log_attivita pronta');
   } catch (err) {
-    console.error('❌ Errore creazione log_attivita:', err);
+    console.error('❌ Errore creazione tabella log_attivita:', err);
   }
 })();
 
-// 📩 Rotta di registrazione
+// ✅ ROTTA DEBUG per testare tabella log_attivita
+app.get('/debug/check-log-table', async (req, res) => {
+  try {
+    const result = await pool.query(`SELECT * FROM log_attivita LIMIT 5`);
+    res.json({ esiste: true, righe: result.rows });
+  } catch (error) {
+    console.error(error);
+    res.json({ esiste: false, errore: error.message });
+  }
+});
+
+// 🔐 Registrazione
 app.post('/api/register', async (req, res) => {
   const { email, password, ruolo } = req.body;
 
@@ -113,7 +124,6 @@ app.post('/api/register', async (req, res) => {
     }
 
     const { data: allUsers, error: userCheckError } = await supabase.auth.admin.listUsers();
-
     if (userCheckError) {
       console.error('Errore controllo utenti Supabase:', userCheckError.message);
       return res.status(500).json({ error: 'Errore verifica Supabase' });
